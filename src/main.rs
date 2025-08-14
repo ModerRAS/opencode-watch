@@ -35,9 +35,6 @@ fn main() -> Result<()> {
     if let Some(pane) = &args.pane {
         config.tmux.pane = pane.clone();
     }
-    if let Some(backend) = &args.backend {
-        config.llm.backend = backend.clone();
-    }
     if let Some(interval) = args.interval {
         config.monitoring.interval = interval;
     }
@@ -49,19 +46,24 @@ fn main() -> Result<()> {
     }
 
     println!("Opencode-Watch 启动成功");
-    println!("使用 LLM 后端: {}", config.llm.backend);
     println!("监控 tmux pane: {}", config.tmux.pane);
     println!("监控间隔: {} 秒", config.monitoring.interval);
     println!("卡住判定: {} 秒", config.monitoring.stuck_sec);
     println!("最大重试: {} 次", config.monitoring.max_retry);
+    println!("干预指令数量: {} 个", config.intervention.commands.len());
     println!("按 Ctrl+C 退出");
 
     let tmux_client = TmuxClient::new();
-    let mut last_content = String::new();
     let mut stuck_count = 0;
+    let mut command_index = 0;
+    
+    // 加载全局配置
+    if let Err(e) = config::Config::load_global(&args.config) {
+        eprintln!("警告: 无法加载全局配置: {}", e);
+    }
 
-    // 创建Tokio运行时
-    let rt = Runtime::new().unwrap();
+    // 创建Tokio运行时（虽然不再需要LLM，但保留以备将来使用）
+    let _rt = Runtime::new().unwrap();
 
     // 简单监控循环
     loop {
@@ -86,57 +88,52 @@ fn main() -> Result<()> {
                     println!("   {}", line);
                 }
                 
-                // 检查是否有变化
-                if content == last_content {
+                // 检查opencode工作状态 - 基于working和esc interrupt标识
+                let has_working = content.contains("working");
+                let has_esc_interrupt = content.contains("esc interrupt");
+                let is_active = has_working || has_esc_interrupt;
+                
+                if is_active {
+                    // 检测到working或esc interrupt，正在工作
+                    stuck_count = 0;
+                    println!("✅ 检测到工作状态 (working: {}, esc interrupt: {})", has_working, has_esc_interrupt);
+                } else {
+                    // 没有检测到working或esc interrupt，可能卡住
                     stuck_count += 1;
-                    println!("⏸️  内容无变化 (第{}次)", stuck_count);
+                    println!("⏸️  工作标识消失 (第{}次)", stuck_count);
                     
                     if stuck_count >= 3 {
-                        println!("🚨 检测到可能卡住状态!");
+                        println!("🚨 检测到卡住状态!");
                         
-                        // 使用LLM分析
-                        if config.llm.backend != "none" {
-                            println!("🤖 使用LLM分析状态...");
-                            let llm_client = llm::LlmClient::new(&config.llm.backend, "llama3.2");
-                            match rt.block_on(llm_client.analyze_state(&content)) {
-                                Ok(analysis) => {
-                                    println!("🧠 LLM分析结果: {}", analysis);
-                                    
-                                    if analysis.contains("卡住") || analysis.contains("stuck") {
-                                        println!("🔧 LLM确认卡住，发送继续指令");
-                                        // 发送"继续"指令
-                                        if let Err(e) = tmux_client.send_keys(&config.tmux.pane, "继续") {
-                                            eprintln!("❌ 发送'继续'指令失败: {}", e);
-                                        } else {
-                                            println!("✅ 已发送'继续'指令");
-                                            // 等待一下再发送回车
-                                            thread::sleep(Duration::from_millis(500));
-                                            if let Err(e) = tmux_client.send_keys(&config.tmux.pane, "Enter") {
-                                                eprintln!("❌ 发送回车失败: {}", e);
-                                            } else {
-                                                println!("✅ 已发送回车，指令执行完成");
-                                            }
-                                        }
-                                    } else {
-                                        println!("✅ LLM认为状态正常，可能是暂时等待");
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("❌ LLM分析失败: {}", e);
-                                }
-                            }
+                        // 获取下一个干预指令
+                        let (command, new_index) = config.get_next_intervention_command(command_index);
+                        command_index = new_index;
+                        
+                        println!("🔧 尝试干预指令 [{}/{}]: '{}'", command_index + 1, config.intervention.commands.len(), command);
+                        
+                        // 直接执行干预（基于明确的working/esc interrupt逻辑，不需要LLM分析）
+                        if let Err(e) = tmux_client.send_keys(&config.tmux.pane, &command) {
+                            eprintln!("❌ 发送指令失败: {}", e);
                         } else {
-                            println!("🔧 检测到卡住，发送继续指令 (无LLM分析)");
-                            // 发送"继续"指令
-                            if let Err(e) = tmux_client.send_keys(&config.tmux.pane, "继续") {
-                                eprintln!("❌ 发送'继续'指令失败: {}", e);
+                            println!("✅ 已发送指令: '{}'", command);
+                            
+                            // 等待指令输入完成，然后发送回车
+                            let command_delay = Duration::from_millis(config.intervention.command_delay_ms);
+                            let enter_delay = Duration::from_millis(config.intervention.enter_delay_ms);
+                            
+                            // 特殊处理C-c命令（不需要回车）
+                            if command == "C-c" {
+                                println!("✅ Ctrl+C已发送，无需回车");
+                            } else if command.starts_with('/') {
+                                println!("✅ 命令指令已发送，无需回车");
                             } else {
-                                println!("✅ 已发送'继续'指令");
-                                // 等待一下再发送回车
-                                thread::sleep(Duration::from_millis(500));
+                                println!("⏳ 等待 {}ms 后发送回车...", config.intervention.enter_delay_ms);
+                                thread::sleep(command_delay);
+                                
                                 if let Err(e) = tmux_client.send_keys(&config.tmux.pane, "Enter") {
                                     eprintln!("❌ 发送回车失败: {}", e);
                                 } else {
+                                    thread::sleep(enter_delay - command_delay);
                                     println!("✅ 已发送回车，指令执行完成");
                                 }
                             }
@@ -145,12 +142,7 @@ fn main() -> Result<()> {
                         // 重置计数器，继续监控
                         stuck_count = 0;
                     }
-                } else {
-                    stuck_count = 0;
-                    println!("✅ 检测到内容变化");
                 }
-                
-                last_content = content;
             }
             Err(e) => {
                 eprintln!("❌ 捕获内容失败: {}", e);
