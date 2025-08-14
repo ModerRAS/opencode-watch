@@ -1,0 +1,36 @@
+[package]
+name = "opencode-watch"
+version = "1.0.0"
+edition = "2021"
+description = "一个极简守护进程，基于opencode活动检测监控opencode，检测到无活动时调用LLM判断最终状态"
+authors = ["opencode-watch contributors"]
+license = "MIT"
+repository = "https://github.com/your-repo/opencode-watch"
+readme = "README.md"
+
+[dependencies]
+seahash = "4.1"
+dotenvy = "0.15"
+serde_json = "1"
+ureq = { version = "2", features = ["json"] }
+regex = "1"
+ollama-rs = "0.3.2"
+tokio = { version = "1.0", features = ["full"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+reqwest = { version = "0.12", features = ["json"] }
+crossterm = "0.27"
+notify = "6.0"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+# Musl构建配置
+[package.metadata.cross.target.x86_64-unknown-linux-musl]
+pre-built = true
+
+# 为musl构建调整依赖
+[target.x86_64-unknown-linux-musl.dependencies]
+# 使用原生tls实现，避免openssl的复杂依赖
+reqwest = { version = "0.12", features = ["json", "native-tls-vendored"] }
