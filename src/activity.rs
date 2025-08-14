@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 use crate::tmux::TmuxClient;
+use anyhow::Result;
 
 pub struct ActivityDetector {
     tmux_client: TmuxClient,
@@ -16,7 +17,7 @@ impl ActivityDetector {
         }
     }
     
-    pub fn check_activity(&mut self, pane: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    pub fn check_activity(&mut self, pane: &str) -> Result<bool> {
         let current_content = self.tmux_client.capture_pane_content(pane)?;
         
         let has_activity = current_content != self.last_content;

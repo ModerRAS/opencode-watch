@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use ollama_rs::generation::completion::request::GenerationRequest;
+use anyhow::Result;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LlmRequest {
@@ -26,17 +27,17 @@ impl LlmClient {
         }
     }
     
-    pub async fn analyze_state(&self, content: &str) -> Result<String, Box<dyn std::error::Error>> {
+    pub async fn analyze_state(&self, content: &str) -> Result<String> {
         match self.backend.as_str() {
             "ollama" => self.analyze_with_ollama(content).await,
             "openai" => self.analyze_with_openai(content).await,
             "openrouter" => self.analyze_with_openrouter(content).await,
             "none" => Ok("无LLM分析".to_string()),
-            _ => Err("不支持的LLM后端".into()),
+            _ => Err(anyhow::anyhow!("不支持的LLM后端")),
         }
     }
     
-    async fn analyze_with_ollama(&self, content: &str) -> Result<String, Box<dyn std::error::Error>> {
+    async fn analyze_with_ollama(&self, content: &str) -> Result<String> {
         let client = ollama_rs::Ollama::default();
         
         let prompt = format!(
@@ -50,7 +51,7 @@ impl LlmClient {
         Ok(response.response)
     }
     
-    async fn analyze_with_openai(&self, content: &str) -> Result<String, Box<dyn std::error::Error>> {
+    async fn analyze_with_openai(&self, content: &str) -> Result<String> {
         let client = reqwest::Client::new();
         
         let request = LlmRequest {
@@ -72,7 +73,7 @@ impl LlmClient {
         Ok(llm_response.response)
     }
     
-    async fn analyze_with_openrouter(&self, content: &str) -> Result<String, Box<dyn std::error::Error>> {
+    async fn analyze_with_openrouter(&self, content: &str) -> Result<String> {
         let client = reqwest::Client::new();
         
         let request = LlmRequest {

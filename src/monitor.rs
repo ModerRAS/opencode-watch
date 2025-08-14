@@ -4,15 +4,18 @@ use crate::config::Config;
 use crate::tmux::TmuxClient;
 use crate::activity::ActivityDetector;
 use crate::llm::LlmClient;
+use anyhow::Result;
 
 pub async fn run_monitoring_loop(
     config: &Config,
-    last_active: &mut Instant,
-    retry_count: &mut usize,
-) -> Result<(), Box<dyn std::error::Error>> {
+    _last_active: &mut Instant,
+    _retry_count: &mut usize,
+) -> Result<()> {
     let tmux_client = TmuxClient::new();
     let mut activity_detector = ActivityDetector::new();
     let llm_client = LlmClient::new(&config.llm.backend, "llama3.2");
+    let mut last_active_local = Instant::now();
+    let mut retry_count_local = 0;
     
     loop {
         sleep(Duration::from_secs(config.monitoring.interval)).await;
@@ -27,11 +30,11 @@ pub async fn run_monitoring_loop(
         match activity_detector.check_activity(&config.tmux.pane) {
             Ok(has_activity) => {
                 if has_activity {
-                    *last_active = Instant::now();
-                    *retry_count = 0;
+                    last_active_local = Instant::now();
+                    retry_count_local = 0;
                     println!("检测到活动");
                 } else {
-                    let inactive_duration = last_active.elapsed();
+                    let inactive_duration = last_active_local.elapsed();
                     if inactive_duration.as_secs() > config.monitoring.stuck_sec {
                         println!("检测到无活动 {} 秒，可能卡住", inactive_duration.as_secs());
                         
@@ -42,16 +45,16 @@ pub async fn run_monitoring_loop(
                                 
                                 // 根据分析结果决定是否需要干预
                                 if analysis.contains("卡住") || analysis.contains("stuck") {
-                                    *retry_count += 1;
-                                    if *retry_count <= config.monitoring.max_retry {
-                                        println!("尝试干预 (第{}次)", *retry_count);
+                                    retry_count_local += 1;
+                                    if retry_count_local <= config.monitoring.max_retry {
+                                        println!("尝试干预 (第{}次)", retry_count_local);
                                         tmux_client.send_keys(&config.tmux.pane, "C-c")?;
                                     } else {
                                         println!("达到最大重试次数，停止干预");
                                         break;
                                     }
                                 } else {
-                                    *retry_count = 0;
+                                    retry_count_local = 0;
                                 }
                             }
                             Err(e) => {
