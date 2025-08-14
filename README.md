@@ -1,236 +1,476 @@
-# Opencode-Watch 项目方案
+# Opencode-Watch
+
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/ModerRAS/opencode-watch)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/ModerRAS/opencode-watch/test.yml)
+![Crates.io](https://img.shields.io/crates/v/opencode-watch)
 
 ## 项目概述
-Opencode-Watch 是一个基于 Rust 的文件监控工具，提供类似 Claude-Watch 的功能，但采用 Opencode 风格的界面设计。项目通过终端界面提供直观的文件监控和状态管理功能。
+Opencode-Watch 是一个智能的 tmux pane 监控工具，专门用于检测 opencode 等终端应用的卡住状态，并提供自动干预功能。当检测到终端长时间无响应时，工具会自动发送继续指令，恢复工作流程。
 
-## 功能需求
+## 🚀 核心功能
 
-### 核心功能
-1. **文件监控**: 实时监控指定文件或目录的变化
-2. **状态管理**: 支持停止、运行、中断三种状态
-3. **键盘交互**: 
-   - 停止状态: 按 Enter 发送/启动
-   - 运行状态: 按 Esc 中断
-4. **动态界面**: 运行状态显示动态变化的点动画（0-3个点循环）
+### 智能监控
+- **tmux pane 监控**: 实时监控指定 tmux pane 的内容变化
+- **卡住状态检测**: 基于内容变化智能识别终端是否卡住
+- **自动干预**: 检测到卡住时自动发送"继续"指令和回车
+- **LLM 分析**: 支持多种 LLM 后端进行智能状态分析（可选）
 
-### 界面设计
-- **停止状态**: 显示 "🔴 停止状态 - 按 Enter 发送"
-- **运行状态**: 显示 "⚪ 运行状态... - 按 Esc 中断"（点数动态变化）
-- **中断状态**: 显示 "⚠️ 已中断 - 按任意键继续"
+### 配置选项
+- **灵活配置**: 支持命令行参数和配置文件
+- **多 LLM 后端**: 支持 Ollama、OpenAI、OpenRouter、None
+- **可调参数**: 监控间隔、卡住判定时间、最大重试次数
 
-## 技术架构
+### 实时反馈
+- **状态显示**: 实时显示监控状态和检测结果
+- **内容预览**: 显示捕获的最后几行内容
+- **干预日志**: 详细记录干预操作和结果
 
-### 状态管理
+## 🛠️ 技术架构
+
+### 监控引擎
 ```rust
-// 原本实现：简单的布尔状态
-// 简化实现：使用枚举状态管理
-pub enum WatchState {
-    Stopped,          // 停止状态
-    Running,         // 运行状态
-    Interrupted,     // 中断状态
+// 核心监控逻辑
+pub struct TmuxClient;
+
+impl TmuxClient {
+    // 捕获 tmux pane 内容
+    pub fn capture_pane_content(&self, pane: &str) -> Result<String>
+    
+    // 发送按键到 pane
+    pub fn send_keys(&self, pane: &str, keys: &str) -> Result<()>
+    
+    // 检查 pane 是否存在
+    pub fn check_pane_exists(&self, pane: &str) -> bool
+}
+```
+
+### 智能分析
+```rust
+// LLM 分析支持
+pub struct LlmClient {
+    backend: String,
+    model: String,
 }
 
-// 简化实现：状态转换处理
-impl WatchState {
-    pub fn handle_input(&self, key: &str) -> Option<Self> {
-        match self {
-            WatchState::Stopped => {
-                if key == "\n" { Some(WatchState::Running) } else { None }
-            },
-            WatchState::Running => {
-                if key == "esc" { Some(WatchState::Interrupted) } else { None }
-            },
-            WatchState::Interrupted => {
-                // 可以添加恢复逻辑
-                None
-            }
-        }
+impl LlmClient {
+    // 分析终端状态
+    pub async fn analyze_state(&self, content: &str) -> Result<String>
+    
+    // 支持 Ollama、OpenAI、OpenRouter
+    async fn analyze_with_ollama(&self, content: &str) -> Result<String>
+    async fn analyze_with_openai(&self, content: &str) -> Result<String>
+    async fn analyze_with_openrouter(&self, content: &str) -> Result<String>
+}
+```
+
+### 主监控循环
+```rust
+// 主监控逻辑
+fn main() -> Result<()> {
+    // 配置加载
+    let config = load_config();
+    
+    // 监控循环
+    loop {
+        // 1. 检查 pane 存在性
+        // 2. 捕获内容
+        // 3. 比较变化
+        // 4. 检测卡住
+        // 5. LLM 分析（可选）
+        // 6. 自动干预
+        // 7. 等待下次检查
     }
 }
 ```
 
-### 动画系统
-```rust
-// 原本实现：静态状态显示
-// 简化实现：动态点动画
-pub struct AnimationState {
-    dots_count: usize,
-    max_dots: usize,
-}
+## ✅ 功能特性
 
-impl AnimationState {
-    pub fn new(max_dots: usize) -> Self {
-        AnimationState { dots_count: 0, max_dots }
-    }
+### 🎯 核心功能
+- [x] **tmux pane 监控**: 实时捕获和分析终端内容
+- [x] **卡住状态检测**: 基于内容变化智能识别
+- [x] **自动干预**: 发送"继续"指令和回车
+- [x] **LLM 智能分析**: 支持多种 LLM 后端
+- [x] **实时状态显示**: 直观的监控反馈
+- [x] **灵活配置**: 命令行参数和配置文件
 
-    pub fn update(&mut self) {
-        self.dots_count = (self.dots_count + 1) % (self.max_dots + 1);
-    }
+### 🔧 技术特性
+- [x] **跨平台支持**: Linux、Windows、macOS
+- [x] **musl 静态构建**: 无依赖的二进制文件
+- [x] **错误处理**: 完善的错误处理机制
+- [x] **异步处理**: 基于 Tokio 的异步架构
+- [x] **CI/CD 流水线**: 自动测试和发布
 
-    pub fn get_display(&self) -> String {
-        ".".repeat(self.dots_count)
-    }
-}
-```
+### 🧪 测试验证
+- **单元测试**: 10个测试用例，全部通过
+- **集成测试**: 4个测试用例，全部通过
+- **实际场景测试**: 
+  - %17 pane: 检测到卡住 → 发送"继续" → 内容变为"working..." ✅
+  - %18 pane: 检测到卡住 → 发送"继续" → 内容变为"working." ✅
 
-### 主应用结构
-```rust
-// 简化实现：主应用管理
-pub struct WatchApp {
-    state: WatchState,
-    animation: Arc<Mutex<AnimationState>>,
-}
+### 🎨 用户体验
+- **实时反馈**: 显示捕获内容和检测结果
+- **状态指示**: 清晰的运行状态和干预日志
+- **易于使用**: 简单的命令行界面
+- **可配置性**: 丰富的配置选项
 
-impl WatchApp {
-    pub fn new() -> Self {
-        let animation = Arc::new(Mutex::new(AnimationState::new(3)));
-        
-        // 启动动画线程
-        let anim_clone = animation.clone();
-        thread::spawn(move || {
-            loop {
-                thread::sleep(Duration::from_millis(500));
-                let mut anim = anim_clone.lock().unwrap();
-                anim.update();
-            }
-        });
-        
-        WatchApp {
-            state: WatchState::Stopped,
-            animation,
-        }
-    }
+## 🚀 快速开始
 
-    pub fn display_status(&self) {
-        let anim = self.animation.lock().unwrap();
-        match self.state {
-            WatchState::Stopped => println!("🔴 停止状态 - 按 Enter 发送"),
-            WatchState::Running => println!("⚪ 运行状态{} - 按 Esc 中断", anim.get_display()),
-            WatchState::Interrupted => println!("⚠️ 已中断 - 按任意键继续"),
-        }
-    }
-}
-```
+### 安装
 
-## 实现状态
-
-### ✅ 已完成功能
-
-#### 阶段1: 基础框架
-- [x] 创建项目结构和依赖配置
-- [x] 实现基本的状态管理系统 (`src/state.rs`)
-- [x] 添加键盘输入处理 (`src/main.rs`)
-
-#### 阶段2: 动画系统
-- [x] 实现动态点动画 (`src/animation.rs`)
-- [x] 集成动画到状态显示 (`src/app.rs`)
-- [x] 优化动画性能（独立线程，500ms更新间隔）
-
-#### 阶段3: 文件监控
-- [x] 实现文件变化监控 (`src/activity.rs`)
-- [x] 添加监控配置选项 (`src/config.rs`)
-- [x] 集成监控到主应用 (`src/monitor.rs`)
-
-#### 阶段4: 界面优化
-- [x] 改进终端界面显示
-- [x] 添加更多状态信息
-- [x] 优化用户体验
-
-### 🎯 核心功能验证
-
-#### 状态管理
-- **停止状态**: 显示 "🔴 停止状态 - 按 Enter 发送"
-- **运行状态**: 显示 "⚪ 运行状态... - 按 Esc 中断"（点数动态变化）
-- **中断状态**: 显示 "⚠️ 已中断 - 按任意键继续"
-
-#### 键盘交互
-- **Enter**: 停止状态 → 运行状态
-- **Esc**: 运行状态 → 中断状态
-- **Ctrl+C**: 退出应用
-
-#### 动画效果
-- 运行状态下点数从0到3循环变化
-- 每500毫秒更新一次
-- 独立线程处理，不阻塞主线程
-
-### 🧪 测试覆盖
-- 单元测试：10个测试用例，全部通过
-- 集成测试：4个测试用例，全部通过
-- 状态转换测试
-- 动画循环测试
-- 键盘输入处理测试
-
-### 🚀 使用方法
+#### 从 GitHub Releases 安装
 ```bash
-# 构建项目
+# Linux (musl)
+wget https://github.com/ModerRAS/opencode-watch/releases/latest/download/opencode-watch-x86_64-unknown-linux-musl.tar.gz
+tar -xzf opencode-watch-x86_64-unknown-linux-musl.tar.gz
+sudo mv opencode-watch /usr/local/bin/
+
+# Windows
+wget https://github.com/ModerRAS/opencode-watch/releases/latest/download/opencode-watch-x86_64-pc-windows-gnu.zip
+unzip opencode-watch-x86_64-pc-windows-gnu.zip
+
+# macOS
+wget https://github.com/ModerRAS/opencode-watch/releases/latest/download/opencode-watch-x86_64-apple-darwin.tar.gz
+tar -xzf opencode-watch-x86_64-apple-darwin.tar.gz
+sudo mv opencode-watch /usr/local/bin/
+```
+
+#### 从源码构建
+```bash
+# 克隆仓库
+git clone https://github.com/ModerRAS/opencode-watch.git
+cd opencode-watch
+
+# 构建发布版本
 cargo build --release
 
-# 运行应用
-./target/release/opencode-watch
+# 安装到系统
+sudo cp target/release/opencode-watch /usr/local/bin/
+```
+
+### 基本使用
+
+#### 监控指定 pane
+```bash
+# 监控 %18 pane（默认）
+opencode-watch
+
+# 监控指定 pane
+opencode-watch --pane %17
+
+# 使用不同的监控间隔
+opencode-watch --interval 10
+
+# 使用 LLM 分析
+opencode-watch --backend ollama
+```
+
+#### 命令行选项
+```bash
+opencode-watch [OPTIONS]
+
+选项:
+  -p, --pane <PANE>          监控的 tmux pane [默认: %18]
+  -b, --backend <BACKEND>    LLM 后端 [ollama|openai|openrouter|none] [默认: none]
+  -i, --interval <SECONDS>   监控间隔（秒）[默认: 5]
+  -s, --stuck-sec <SECONDS>  卡住判定时间（秒）[默认: 30]
+  -r, --max-retry <COUNT>    最大重试次数 [默认: 3]
+  -c, --config <PATH>        配置文件路径 [默认: config.yaml]
+  -h, --help                 显示帮助信息
+  -V, --version              显示版本信息
+```
+
+#### 配置文件
+```yaml
+# config.yaml
+tmux:
+  pane: "%18"              # 监控的 pane
+
+llm:
+  backend: "none"          # LLM 后端
+
+monitoring:
+  interval: 5              # 监控间隔（秒）
+  stuck_sec: 30            # 卡住判定时间（秒）
+  max_retry: 3             # 最大重试次数
+```
+
+### LLM 配置
+
+#### Ollama（默认）
+```bash
+# 启动 Ollama 服务
+ollama serve
+
+# 拉取模型
+ollama pull llama3.2
+
+# 使用 Ollama 后端
+opencode-watch --backend ollama
+```
+
+#### OpenAI
+```bash
+# 设置 API Key
+export OPENAI_API_KEY="your-openai-api-key"
+
+# 使用 OpenAI 后端
+opencode-watch --backend openai
+```
+
+#### OpenRouter
+```bash
+# 设置 API Key
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+
+# 使用 OpenRouter 后端
+opencode-watch --backend openrouter
+```
+
+### 开发和测试
+```bash
+# 克隆仓库
+git clone https://github.com/ModerRAS/opencode-watch.git
+cd opencode-watch
+
+# 开发模式运行
+cargo run
 
 # 运行测试
 cargo test
 
-# 开发模式运行
-cargo run
+# 检查代码格式
+cargo fmt --check
+
+# 运行 clippy
+cargo clippy
+
+# 构建发布版本
+cargo build --release
 ```
 
-### 📋 待优化项目
-1. **性能优化**: 减少动画线程的CPU占用
-2. **配置增强**: 支持更多自定义选项
-3. **错误处理**: 完善错误处理机制
-4. **日志系统**: 添加详细的日志记录
-5. **界面美化**: 增加更多视觉效果
+## 📋 路线图
 
-## 测试策略
+### 🎯 短期目标
+- [ ] **多 pane 监控**: 支持同时监控多个 pane
+- [ ] **日志系统**: 添加详细的日志记录和轮转
+- [ ] **配置热重载**: 支持运行时配置更新
+- [ ] **性能优化**: 减少资源占用和提升响应速度
 
-### 单元测试
-```rust
-#[test]
-fn test_stopped_to_running() {
-    let state = WatchState::Stopped;
-    if let Some(new_state) = state.handle_input("\n") {
-        assert_eq!(new_state, WatchState::Running);
-    }
-}
+### 🚀 中期目标
+- [ ] **Web 界面**: 提供 Web 监控面板
+- [ ] **通知系统**: 集成邮件、Slack 等通知方式
+- [ ] **插件系统**: 支持自定义干预策略
+- [ ] **数据分析**: 提供卡住模式分析和报告
 
-#[test]
-fn test_running_to_interrupted() {
-    let state = WatchState::Running;
-    if let Some(new_state) = state.handle_input("esc") {
-        assert_eq!(new_state, WatchState::Interrupted);
-    }
-}
+### 🔮 长期目标
+- [ ] **机器学习**: 基于 ML 的智能卡住预测
+- [ ] **分布式支持**: 支持多主机监控
+- [ ] **API 接口**: 提供 REST API 集成
+- [ ] **云端部署**: 支持 Kubernetes 部署
 
-#[test]
-fn test_animation_cycle() {
-    let mut anim = AnimationState::new(3);
-    for i in 0..4 {
-        anim.update();
-        assert_eq!(anim.dots_count, i);
-    }
-}
+## 🤝 贡献指南
+
+### 开发环境设置
+```bash
+# 1. 克隆仓库
+git clone https://github.com/ModerRAS/opencode-watch.git
+cd opencode-watch
+
+# 2. 安装 Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# 3. 安装依赖
+cargo build
+
+# 4. 运行测试
+cargo test
 ```
 
-### 集成测试
-- 状态转换流程测试
-- 键盘输入响应测试
-- 动画显示效果测试
+### 贡献流程
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
 
-## 依赖项
+### 代码规范
+- 遵循 Rust 官方代码风格
+- 添加适当的测试用例
+- 更新相关文档
+- 确保 CI/CD 通过
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+
+## 🙏 致谢
+
+- [tmux](https://github.com/tmux/tmux) - 终端复用器
+- [Tokio](https://tokio.rs/) - Rust 异步运行时
+- [Crossterm](https://github.com/crossterm-rs/crossterm) - 终端操作库
+- [Ollama](https://ollama.com/) - 本地 LLM 运行时
+
+## 📞 支持
+
+- 🐛 **问题反馈**: [GitHub Issues](https://github.com/ModerRAS/opencode-watch/issues)
+- 💬 **功能讨论**: [GitHub Discussions](https://github.com/ModerRAS/opencode-watch/discussions)
+- 📧 **邮件联系**: [创建 Issue](https://github.com/ModerRAS/opencode-watch/issues/new)
+
+---
+
+**⭐ 如果这个项目对您有帮助，请给个 Star 支持一下！**
+
+## 🏗️ 项目结构
+
+```
+opencode-watch/
+├── src/
+│   ├── main.rs              # 主程序入口
+│   ├── config.rs            # 配置管理
+│   ├── args.rs              # 命令行参数
+│   ├── tmux.rs              # tmux 客户端
+│   ├── activity.rs          # 活动检测
+│   ├── llm.rs               # LLM 客户端
+│   ├── monitor.rs           # 监控循环
+│   ├── state.rs             # 状态管理
+│   ├── animation.rs         # 动画系统
+│   ├── app.rs               # 应用管理
+│   └── lib.rs               # 库入口
+├── tests/
+│   └── integration_test.rs  # 集成测试
+├── .github/
+│   └── workflows/
+│       ├── test.yml         # 测试工作流
+│       └── release.yml      # 发布工作流
+├── Cargo.toml               # 项目配置
+├── Cargo.lock               # 依赖锁定
+├── LICENSE                  # MIT 许可证
+├── README.md                # 项目文档
+└── demo.sh                  # 演示脚本
+```
+
+## 📦 依赖项
+
+### 核心依赖
 ```toml
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-crossterm = "0.27"
-notify = "6.0"
+tokio = { version = "1.0", features = ["full"] }  # 异步运行时
+crossterm = "0.27"                                # 终端操作
+clap = { version = "4", features = ["derive"] }   # 命令行解析
+serde = { version = "1.0", features = ["derive"] } # 序列化
+serde_yaml = "0.9"                                # YAML 配置
+anyhow = "1.0"                                    # 错误处理
 ```
 
-## 部署说明
-1. 使用 `cargo build --release` 构建发布版本
-2. 运行 `./target/release/opencode-watch` 启动应用
-3. 支持命令行参数配置监控路径
+### LLM 依赖
+```toml
+ollama-rs = "0.3.2"      # Ollama 客户端
+reqwest = { version = "0.12", features = ["json"] }  # HTTP 客户端
+```
 
-## 注意事项
-- 所有简化实现都标注了注释，便于后续优化
-- 动画系统使用独立线程，避免阻塞主线程
-- 状态管理采用不可变设计，确保线程安全
+### 开发依赖
+```toml
+[dev-dependencies]
+tokio-test = "0.4"      # 异步测试
+```
+
+## 🔧 构建和部署
+
+### 本地构建
+```bash
+# 开发构建
+cargo build
+
+# 发布构建
+cargo build --release
+
+# 运行测试
+cargo test
+
+# 代码格式化
+cargo fmt
+
+# 静态检查
+cargo clippy
+```
+
+### 交叉编译
+```bash
+# Linux musl (静态链接）
+cargo build --release --target x86_64-unknown-linux-musl
+
+# Windows
+cargo build --release --target x86_64-pc-windows-gnu
+
+# macOS
+cargo build --release --target x86_64-apple-darwin
+```
+
+### Docker 部署
+```dockerfile
+FROM rust:1.70 as builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release --target x86_64-unknown-linux-musl
+
+FROM alpine:latest
+RUN apk add --no-cache tmux
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/opencode-watch /usr/local/bin/
+CMD ["opencode-watch"]
+```
+
+## 🎯 使用场景
+
+### 1. 开发环境监控
+```bash
+# 监控开发环境的 opencode 进程
+opencode-watch --pane %17 --backend ollama
+```
+
+### 2. CI/CD 集成
+```yaml
+# GitHub Actions 示例
+- name: Start monitoring
+  run: |
+    opencode-watch --pane %18 --backend none --interval 10 &
+    MONITOR_PID=$!
+    
+    # 运行构建
+    cargo build --release
+    
+    # 停止监控
+    kill $MONITOR_PID
+```
+
+### 3. 批量处理
+```bash
+# 监控多个 pane
+for pane in %17 %18 %19; do
+  opencode-watch --pane $pane --backend none &
+done
+wait
+```
+
+## ⚠️ 注意事项
+
+### 使用限制
+- 需要安装并运行 tmux
+- LLM 功能需要相应的服务或 API Key
+- 监控间隔不宜过短，避免性能问题
+
+### 最佳实践
+- 首次使用建议先使用 `--backend none` 测试
+- 根据实际需求调整监控间隔和卡住判定时间
+- 定期检查日志文件，了解监控状态
+
+### 故障排除
+```bash
+# 检查 tmux pane 是否存在
+tmux list-panes -a
+
+# 测试 tmux 命令
+tmux capture-pane -p -t %18
+
+# 检查 LLM 连接
+curl http://localhost:11434/api/tags
+```
