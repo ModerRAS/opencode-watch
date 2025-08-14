@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build for ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            binary_name: opencode-watch
+          - target: x86_64-pc-windows-gnu
+            os: windows-latest
+            binary_name: opencode-watch.exe
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            binary_name: opencode-watch
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install musl tools (Linux)
+      if: matrix.target == 'x86_64-unknown-linux-musl'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y musl-tools musl-dev
+
+    - name: Build release binary
+      run: |
+        cargo build --release --target ${{ matrix.target }}
+
+    - name: Create package
+      shell: bash
+      run: |
+        mkdir -p package
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" package/
+        else
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" package/
+          chmod +x "package/${{ matrix.binary_name }}"
+        fi
+        
+        # 添加README和许可证文件
+        cp README.md package/
+        cp LICENSE package/
+        
+        # 创建压缩包
+        cd package
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          7z a "../opencode-watch-${{ matrix.target }}.zip" *
+        else
+          tar -czf "../opencode-watch-${{ matrix.target }}.tar.gz" *
+        fi
+        cd ..
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: opencode-watch-${{ matrix.target }}
+        path: |
+          opencode-watch-${{ matrix.target }}.tar.gz
+          opencode-watch-${{ matrix.target }}.zip
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          opencode-watch-x86_64-unknown-linux-musl/opencode-watch-x86_64-unknown-linux-musl.tar.gz
+          opencode-watch-x86_64-pc-windows-gnu/opencode-watch-x86_64-pc-windows-gnu.zip
+          opencode-watch-x86_64-apple-darwin/opencode-watch-x86_64-apple-darwin.tar.gz
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
