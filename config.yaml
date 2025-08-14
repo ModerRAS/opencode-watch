@@ -7,9 +7,9 @@ tmux:
 
 ## 监控配置
 monitoring:
-  interval: 8               # 监控间隔（秒）- 建议5-15秒
-  stuck_sec: 30             # 卡住判定时间（秒）- 建议20-60秒
-  max_retry: 6               # 最大重试次数 - 建议6次以支持完整命令循环
+  interval: 5               # 监控间隔（秒）- 建议5-15秒
+  stuck_sec: 15             # 卡住判定时间（秒）- 建议20-60秒
+  max_retry: 1000             # 最大重试次数 - 建议6次以支持完整命令循环
 
 ## 干预配置
 intervention:
@@ -21,84 +21,13 @@ intervention:
   # 每次检测到卡住时，会按顺序选择下一条指令执行
   commands:
     - "继续"                 # 基础继续指令
-    - "继续工作"              # 友好提示
+    - "Continue"
     - "请继续"               # 礼貌请求
-    - "/compact"             # 上下文压缩指令（特殊处理）
-    - "C-c"                  # 中断当前操作
-    - "请继续工作"            # 礼貌的工作继续请求
-
-## 配置说明
-
-### 工作原理
-- **卡住判断**: 基于"working"和"esc interrupt"标识的消失来判断卡住状态
-- **工作状态**: 当检测到"working"或"esc interrupt"标识时，认为opencode正在正常工作
-- **卡住状态**: 当"working"和"esc interrupt"标识都消失时，认为opencode卡住
-
-### 干预指令列表
-- **循环机制**: 指令按列表顺序循环使用，每次卡住时执行下一条
-- **特殊指令**: 
-  - 以`/`开头的指令为特殊命令（如`/compact`）
-  - `C-c`表示发送Ctrl+C中断信号
-- **延迟配置**: 
-  - `command_delay_ms`: 指令发送完成后的等待时间
-  - `enter_delay_ms`: 回车键发送延迟时间
-
-### 推荐配置
-```yaml
-# 针对不同场景的推荐配置
-
-# 高频率监控（快速响应）
-monitoring:
-  interval: 5
-  stuck_sec: 20
-  max_retry: 6
-intervention:
-  command_delay_ms: 800
-  enter_delay_ms: 2000
-
-# 标准监控（平衡性能）
-monitoring:
-  interval: 8
-  stuck_sec: 30
-  max_retry: 6
-intervention:
-  command_delay_ms: 1000
-  enter_delay_ms: 3000
-
-# 低频率监控（减少干扰）
-monitoring:
-  interval: 15
-  stuck_sec: 60
-  max_retry: 6
-intervention:
-  command_delay_ms: 1500
-  enter_delay_ms: 4000
-```
-
-### 指令列表定制示例
-```yaml
-# 简单配置
-intervention:
-  commands:
-    - "继续"
-    - "/compact"
-
-# 详细配置
-intervention:
-  commands:
-    - "继续"
-    - "继续工作"
-    - "请继续"
-    - "/compact"
-    - "C-c"
-    - "请继续工作"
-
-# 针对特定项目的配置
-intervention:
-  commands:
     - "continue"
-    - "please continue"
-    - "/compact"
-    - "C-c"
-    - "resume work"
-```
+    - "请继续"               # 礼貌请求
+    - "继续"                 # 基础继续指令
+    - "继续工作，如果你忘了要干什么，就去看一眼之前写的工作记录"              # 友好提示
+    - "请继续"               # 礼貌请求
+    - "继续工作，记得定期做git commit"             # 上下文压缩指令（特殊处理）
+    - "请继续工作，并记得编写工作记录"            # 礼貌的工作继续请求
+

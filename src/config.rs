@@ -20,6 +20,8 @@ pub struct MonitoringConfig {
     pub interval: u64,
     pub stuck_sec: u64,
     pub max_retry: usize,
+    #[serde(default = "default_long_stuck_sec")]
+    pub long_stuck_sec: u64,  // 第二阶段：长时间无变化判定时间
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +43,7 @@ impl Default for Config {
             monitoring: MonitoringConfig {
                 interval: 5,
                 stuck_sec: 30,
+                long_stuck_sec: 120, // 2分钟
                 max_retry: 6, // 增加到6次以支持完整的命令循环
             },
             intervention: InterventionConfig {
@@ -57,6 +60,11 @@ impl Default for Config {
             },
         }
     }
+}
+
+// 默认长时间无变化判定时间（秒）
+fn default_long_stuck_sec() -> u64 {
+    120  // 2分钟
 }
 
 // 默认干预指令列表
