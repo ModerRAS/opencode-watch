@@ -4,6 +4,30 @@
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/ModerRAS/opencode-watch/test.yml)
 ![Crates.io](https://img.shields.io/crates/v/opencode-watch)
 
+## 🤖 项目生成说明
+
+**本项目是纯 Vibe Coding 生成的开源项目**，使用以下工具链自动生成：
+
+- **主要生成工具**: [opencode](https://opencode.ai/) - 智能代码生成平台
+- **辅助生成工具**: GLM-4.5 - 智能语言模型
+- **生成方式**: 完全自动化的代码生成、测试、文档编写和项目维护
+- **项目特色**: 零人工编码的完整 Rust 项目，包含完整的测试、文档和 CI/CD 流水线
+
+## ⚠️ 重要提醒
+
+### LLM 功能未测试
+**注意**: 本项目中的 LLM 功能（包括 Ollama、OpenAI、OpenRouter 后端）**尚未经过实际测试验证**。虽然代码中包含了完整的 LLM 集成逻辑，但这些功能在实际使用中可能存在以下问题：
+
+- **连接问题**: LLM 服务连接可能失败
+- **API 兼容性**: 不同 LLM 提供商的 API 可能有差异
+- **响应格式**: LLM 响应格式可能与预期不符
+- **性能问题**: LLM 调用可能影响监控性能
+
+**建议**: 
+1. 首次使用请先使用 `--backend none` 模式测试基本监控功能
+2. 如需使用 LLM 功能，请先在测试环境中验证
+3. 发现 LLM 相关问题时请提交 Issue
+
 ## 项目概述
 Opencode-Watch 是一个智能的 tmux pane 监控工具，专门用于检测 opencode 等终端应用的卡住状态，并提供自动干预功能。当检测到终端长时间无响应时，工具会自动发送继续指令，恢复工作流程。
 
@@ -447,6 +471,7 @@ opencode-watch/
 │   ├── app.rs               # 应用管理
 │   └── lib.rs               # 库入口
 ├── tests/
+│   ├── config_test.rs       # 配置测试
 │   └── integration_test.rs  # 集成测试
 ├── .github/
 │   └── workflows/
@@ -456,7 +481,8 @@ opencode-watch/
 ├── Cargo.lock               # 依赖锁定
 ├── LICENSE                  # MIT 许可证
 ├── README.md                # 项目文档
-└── demo.sh                  # 演示脚本
+├── AGENTS.md                # 代理指令
+└── config.yaml              # 配置文件
 ```
 
 ## 📦 依赖项
